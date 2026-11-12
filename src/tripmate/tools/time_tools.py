@@ -55,3 +55,26 @@ def trip_days(start_date: date, end_date: date) -> int:
             f"{start_date.isoformat()}. Swap them or check the dates."
         )
     return (end_date - start_date).days + 1
+
+
+def days_until_trip(start_date: date) -> int:
+    """Count how many days are left until a trip starts.
+
+    Counts from today's date (the server's local calendar date). A trip that
+    starts tomorrow is 1 day away; a trip that starts today is 0 days away.
+
+    Args:
+        start_date: The first day of the trip, in ISO format "YYYY-MM-DD".
+            Must be today or later; a date in the past is an error.
+
+    Returns:
+        The number of days from today until start_date, as a whole number
+        (0 if the trip starts today).
+    """
+    today = date.today()
+    if start_date < today:
+        raise ToolError(
+            f"start_date {start_date.isoformat()} is in the past "
+            f"(today is {today.isoformat()}). Give a date today or later."
+        )
+    return (start_date - today).days
