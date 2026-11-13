@@ -46,3 +46,65 @@ Add a tool that tells how many days are left until a trip starts. A date in the 
 • ToolError: the exception that sends a readable error back to the model.
 • CLAUDE.md: a project file Claude Code reads at the start of every session.
 • Scope: where claude mcp add saves the server (local, project, user).
+
+
+
+
+
+Create a Claude Code rules file at
+.claude/rules/mcp-tools.md.
+
+It should only apply to files matching
+src/tripmate/tools/**/*.py
+(use a paths: list in YAML frontmatter).
+
+Rules, as a short bullet list:
+
+- Each tool is a plain function in src/tripmate/tools/,
+  registered in src/tripmate/app.py with mcp.add_tool().
+- Use type hints for every parameter.
+  Use Pydantic models for structured input and output.
+- The docstring is for the AI model: say what the tool
+  does, when to use it, and the format of each argument
+  with an example.
+- For bad input or a missing record, raise ToolError
+  from mcp.server.mcpserver.exceptions with a message
+  that tells the model how to fix the call.
+- Set tool annotations in app.py: readOnlyHint for
+  tools that only read, destructiveHint for tools
+  that delete.
+- Never print to stdout.
+
+Keep it under 20 lines.
+
+
+
+Add a Claude Code hook to this project that protects the MCP server after every file edit.
+- Write the hook as a Python script at .claude/hooks/check_server.py (standard library only). It reads the hook JSON from stdin and gets tool_input.file_path.
+- Only check .py files under src/.
+- Check 1: if the file has a print( call that does not write to sys.stderr, block with exit code 2 and a message on stderr explaining that stdout carries MCP messages over stdio.
+- Check 2: run `uv run python -c "import tripmate.app"` in the project folder; if it fails, exit 2 and show the error on stderr.
+- Otherwise exit 0.
+- Register it in .claude/settings.json as a PostToolUse hook with matcher "Edit|Write", running: uv run --no-project python "$CLAUDE_PROJECT_DIR/.claude/hooks/check_server.py"
+Keep the script short and commented.
+
+
+Add trip storage to TripMate. Do not add any MCP tools yet.
+1. Create src/tripmate/models.py with Pydantic v2 models:
+   - TripIn: name (str, 1-100 chars), destination (str, a city name like "Tokyo"), start_date (date), end_date (date), notes (str, optional, default ""). Validate that end_date is not before start_date.
+   - Trip: everything in TripIn plus id (int). Give every field a Field(description=...) because the AI model reads them.
+2. Create src/tripmate/storage.py using only the standard library sqlite3:
+   - The database file path comes from the TRIPMATE_DB environment variable, default ~/.tripmate/trips.db. Create the folder if needed.
+   - Create the trips table on first use.
+   - Functions: add_trip(trip: TripIn) -> Trip, list_trips() -> list[Trip], get_trip(trip_id: int) -> Trip | None, delete_trip(trip_id: int) -> bool.
+   - Open a new connection per call with a context manager. Keep it simple, no ORM.
+Then run a quick check with uv run python -c that adds and lists a trip using a temporary TRIPMATE_DB, and show me the output.
+
+
+
+Add MCP tools for trips in src/tripmate/tools/trip_tools.py, using storage.py and models.py:
+- create_trip: takes the trip details and returns the saved Trip.
+- list_trips: returns all saved trips.
+- get_trip: takes a trip id and returns that Trip.
+- delete_trip: takes a trip id and deletes it.
+Register them in app.py with the right tool annotations, and update the server instructions. Follow the project rules.

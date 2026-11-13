@@ -32,4 +32,54 @@ claude mcp remove tripmate
 # git
 git add -A && git commit -m "Session 1: TripMate with time tools"
 
+claude mcp add tripmate -e TRIPMATE_DB=./practice.db -- uv run --directory "$(pwd)" tripmate
 
+
+claude mcp add tripmate -e TRIPMATE_DB="$(pwd)/data/practice.db" -- uv run --directory "$(pwd)" tripmate
+
+
+def trip_days(start_date: date, end_date: date) -> int:
+
+
+from pydantic import BaseModel, Field
+from datetime import date
+
+class TripIn(BaseModel):
+    name: str = Field(description="Name of the trip")
+    destination: str = Field(description="Destination city")
+    start_date: date
+    end_date: date
+    notes: str = ""
+
+response_model= TripIn
+
+
+def create_trip(trip: TripIn):
+
+def create_trip(trip: TripIn) -> Trip:
+
+
+TripIn(
+    name="Winter in Japan",
+    destination="Tokyo",
+    start_date=date(2026, 12, 20),
+    end_date=date(2026, 12, 24)
+)
+
+
+Trip(
+    id=1,
+    name="Winter in Japan",
+    destination="Tokyo",
+    start_date=date(2026, 12, 20),
+    end_date=date(2026, 12, 24),
+    notes=""
+)
+
+
+.claude/
+  rules/
+    mcp-tools.md
+
+
+Hooks
