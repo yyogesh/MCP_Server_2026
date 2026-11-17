@@ -108,3 +108,53 @@ Add MCP tools for trips in src/tripmate/tools/trip_tools.py, using storage.py an
 - get_trip: takes a trip id and returns that Trip.
 - delete_trip: takes a trip id and deletes it.
 Register them in app.py with the right tool annotations, and update the server instructions. Follow the project rules.
+
+
+
+Create a Claude Code rules file at .claude/rules/api-clients.md that only applies to files matching src/tripmate/clients/**/*.py and src/tripmate/tools/**/*.py (use a `paths:` list in YAML frontmatter). Rules, as a short bullet list:
+- All HTTP calls use httpx.AsyncClient. Never use requests (it blocks the server).
+- Code for one external API lives in its own module in src/tripmate/clients/ and returns Pydantic models, never raw JSON.
+- Tools never create their own HTTP client. They use the shared client from the server lifespan, reached through the Context parameter.
+- Base URLs and timeouts come from src/tripmate/config.py, never hard-coded in tools.
+- Always set a timeout. Turn network errors, timeouts and bad status codes into ToolError with a short message for the model; never leak a stack trace.
+- Tools that call the internet get the open-world annotation.
+Keep it under 20 lines.
+
+
+
+
+Create a Claude Code skill for this project called add-tool, so I can type `/add-tool <what the tool should do>`. Save it as .claude/skills/add-tool/SKILL.md.
+Frontmatter: name add-tool, a one-line description ("Add a new MCP tool to TripMate"), argument-hint "<what the tool should do>", and disable-model-invocation: true so it only runs when I type it.
+The body tells Claude to do these steps for $ARGUMENTS, in order:
+1. Pick a clear snake_case tool name and say which file it goes in (an existing file in src/tripmate/tools/ if it fits, otherwise a new one).
+2. Write the tool as a plain function following .claude/rules/ (docstring for the model, type hints, ToolError for bad input).
+3. Register it in src/tripmate/app.py with the right annotations.
+4. Test it with an in-memory client: `uv run python -c` using `from mcp import Client` and `Client(mcp)`, calling the tool once with good input and once with bad input. Use a temporary TRIPMATE_DB.
+5. Finish with a short summary: tool name, file, annotations, and both test results.
+Keep the skill under 30 lines.
+
+
+
+Prepare TripMate to call free public web APIs. No new tools yet.
+1. Run `uv add httpx pydantic-settings`.
+2. Create src/tripmate/config.py with a pydantic-settings Settings class (env prefix TRIPMATE_): geocoding_url = "https://geocoding-api.open-meteo.com/v1/search", forecast_url = "https://api.open-meteo.com/v1/forecast", currency_url = "https://api.frankfurter.dev/v1", http_timeout = 10.0 seconds. Export one `settings` object.
+3. Add a lifespan to the server in app.py: create ONE shared httpx.AsyncClient (with the timeout from settings and a User-Agent "TripMate/0.1") when the server starts, close it when it stops, and expose it as an AppContext dataclass with an `http` field. Pass it with MCPServer(..., lifespan=...). Check the installed MCP SDK v2 source to see how a tool reaches the lifespan object through its Context parameter, and write a small helper get_http(ctx) in src/tripmate/clients/__init__.py that returns the shared client.
+4. Do not change the existing tools.
+Then run the in-memory client to check that all existing tools still work.
+
+
+
+Create src/tripmate/clients/weather.py, an async client for the free Open-Meteo APIs (no API key). Follow the project rules. Use the URLs from config.
+- find_city(http, name) -> City: calls the geocoding API with name=<name>&count=1&language=en&format=json. The response looks like {"results": [{"name": "Tokyo", "latitude": 35.6895, "longitude": 139.69171, "country": "Japan", "timezone": "Asia/Tokyo", ...}]}. If "results" is missing or empty, raise ToolError saying the city was not found and to try the English city name.
+- get_daily_forecast(http, city, days) -> list[DayForecast]: calls the forecast API with latitude, longitude, timezone=auto, forecast_days=days and daily=temperature_2m_max,temperature_2m_min,precipitation_probability_max,weather_code. The response has "daily": {"time": [...], "temperature_2m_max": [...], "temperature_2m_min": [...], "precipitation_probability_max": [...], "weather_code": [...]}.
+- DayForecast has date, temp_max_c, temp_min_c, rain_chance_percent and conditions: a short English text from the WMO weather code (e.g. 0 "Clear sky", 61 "Light rain"); use a small dict, "Unknown" for others.
+- Pydantic models City and DayForecast with Field descriptions.
+- Turn httpx timeouts, connection errors and non-200 responses into ToolError with a short message.
+Test it with a real call for Tokyo, and with one unknown city.
+
+
+
+/add-tool convert_currency: convert an amount from one currency to another with today's rate, using the free Frankfurter API (no key). Put the API code in a new src/tripmate/clients/currency.py. The call is GET {currency_url}/latest?base=USD&symbols=INR and returns {"amount": 1.0, "base": "USD", "date": "2026-11-12", "rates": {"INR": 94.49}}. Currency codes are 3-letter ISO codes like USD, EUR, INR, JPY; an unknown code gives HTTP 404, which should become a ToolError that asks for a valid ISO code. Return the converted amount, the rate and the rate date.
+
+
+/add-tool list_currencies: list the currency codes Frankfurter supports (GET {currency_url}/currencies returns {"USD": "United States Dollar", ...}).
