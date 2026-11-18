@@ -158,3 +158,37 @@ Test it with a real call for Tokyo, and with one unknown city.
 
 
 /add-tool list_currencies: list the currency codes Frankfurter supports (GET {currency_url}/currencies returns {"USD": "United States Dollar", ...}).
+
+
+
+Create a Claude Code rules file at .claude/rules/mcp-resources-prompts.md. It should only apply to files matching src/tripmate/resources/**/*.py and src/tripmate/prompts/**/*.py (use a `paths:` list in YAML frontmatter). Check the installed MCP SDK v2 source first so the rules match the real API. Rules, as a short bullet list:
+- Resources are read-only data the app can open, like a document. They never change anything. URIs use the trip:// scheme, e.g. trip://trips and trip://trips/{trip_id}.
+- Resources live in src/tripmate/resources/, prompts in src/tripmate/prompts/, as plain functions registered in src/tripmate/app.py (not decorated where they are defined).
+- Every resource has a name, a short description and a mime_type. Return JSON text for data (mime_type application/json).
+- A missing record in a resource raises the SDK resource error with a clear message.
+- Prompts are templates the user picks. They take a few simple string arguments, have a docstring that becomes the description, and return messages that tell the model which TripMate tools to use by name.
+- Never print to stdout.
+Keep it under 20 lines.
+
+
+
+Add MCP resources for saved trips, following the project rules. Put them in src/tripmate/resources/trip_resources.py, using storage.py:
+- trip://trips: all saved trips as a JSON list (id, name, destination, start_date, end_date).
+- trip://trips/{trip_id}: one trip as JSON, with all its fields plus "days" (the trip length, counting first and last day).
+Register both in app.py with a name, description and mime_type. Then test with the in-memory client (Client(mcp)) using a temporary TRIPMATE_DB: create a trip with the create_trip tool, list the resources and resource templates, read both URIs, and read trip://trips/999 to show the error.
+
+
+
+Add two MCP prompts in src/tripmate/prompts/trip_prompts.py, following the project rules, and register them in app.py:
+1. plan_trip(destination, start_date, end_date, home_currency="INR"): asks the model to plan the trip step by step using TripMate tools: save it with create_trip, check the weather with get_forecast, give the local time with local_time, convert a sample daily budget with convert_currency into the home currency, and finish with a short day-by-day plan.
+2. packing_list(trip_id): reads the saved trip from storage (raise a clear error if it does not exist) and asks the model to check the forecast for that destination with get_forecast and write a packing list grouped by category, tuned to the weather and the trip length.
+Then test with the in-memory client using a temporary TRIPMATE_DB: list the prompts with their arguments, get plan_trip with sample arguments, create a trip and get packing_list for it, and get packing_list for id 999 to show the error.
+
+
+
+Extend client.py so that, after the existing steps, it also:
+4. lists the resources and resource templates (URI and name),
+5. reads trip://trips and prints the text,
+6. lists the prompts with their argument names,
+7. gets the plan_trip prompt for Tokyo, 2026-12-20 to 2026-12-24, and prints the message text.
+Keep a comment above each step. Run it with a temporary TRIPMATE_DB and show me the output.

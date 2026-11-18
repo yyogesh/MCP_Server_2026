@@ -13,6 +13,8 @@ from mcp.types import ToolAnnotations
 
 from tripmate.clients import AppContext
 from tripmate.config import settings
+from tripmate.prompts.trip_prompts import packing_list, plan_trip
+from tripmate.resources.trip_resources import all_trips, one_trip
 from tripmate.tools.currency_tools import convert_currency, list_currencies
 from tripmate.tools.time_tools import days_until_trip, local_time, trip_days
 from tripmate.tools.trip_tools import create_trip, delete_trip, get_trip, list_trips
@@ -105,3 +107,23 @@ mcp.add_tool(
         open_world_hint=True,
     ),
 )
+
+# Resources: read-only trip data, registered here rather than decorated at definition.
+mcp.resource(
+    "trip://trips",
+    name="trips",
+    title="Saved trips",
+    description="All saved trips as a JSON list of id, name, destination, start_date and end_date.",
+    mime_type="application/json",
+)(all_trips)
+mcp.resource(
+    "trip://trips/{trip_id}",
+    name="trip",
+    title="Saved trip",
+    description="One saved trip as JSON: all its fields plus days, the trip length counting first and last day.",
+    mime_type="application/json",
+)(one_trip)
+
+# Prompts: templates the user picks; the docstring becomes the description.
+mcp.prompt(title="Plan a trip")(plan_trip)
+mcp.prompt(title="Packing list")(packing_list)
