@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "tripmate": {
+      "type": "stdio",
+      "command": "uv",
+      "args": [
+        "run",
+        "tripmate"
+      ],
+      "env": {}
+    }
+  }
+}

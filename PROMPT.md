@@ -192,3 +192,26 @@ Extend client.py so that, after the existing steps, it also:
 6. lists the prompts with their argument names,
 7. gets the plan_trip prompt for Tokyo, 2026-12-20 to 2026-12-24, and prints the message text.
 Keep a comment above each step. Run it with a temporary TRIPMATE_DB and show me the output.
+
+
+Create a Claude Code skill called check, so I can type `/check` to get a quick health report for TripMate. Save it as .claude/skills/check/SKILL.md.
+Frontmatter: name check, description "Health check for the TripMate MCP server", disable-model-invocation: true, and allowed-tools limited to running uv and git commands (Bash(uv run:*), Bash(git status:*)).
+The body tells Claude to run these steps and keep going even if one fails:
+1. Import check: uv run python -c "import tripmate.app".
+2. Inventory: use an in-memory Client(mcp) with a temporary TRIPMATE_DB and print how many tools, resources, resource templates and prompts the server has, with their names.
+3. Client run: run client.py with a temporary TRIPMATE_DB and say whether it finished without errors.
+4. git status --short.
+5. Finish with a short table: Check, Result (OK or FAIL), Detail.
+Do not change any files. Keep it under 30 lines.
+
+
+Create explore.py in the project root: a small, generic MCP explorer that works with ANY stdio MCP server, not just TripMate. Usage:
+  uv run explore.py -- <server command> [args...]
+  uv run explore.py --call TOOL '<json args>' -- <server command>
+  uv run explore.py --read URI -- <server command>
+  uv run explore.py --prompt NAME '<json args>' -- <server command>
+With no action, print sections: server name and instructions, tools (name, first line of description, required arguments, and annotation hints that are set), resources, resource templates, prompts (with arguments). Skip a section cleanly if the server does not support that feature. --call prints is_error, the text content and the structured content if any. --read prints the text of each content item. --prompt prints each message with its role.
+Keep it under 120 lines with short comments. Then run it against TripMate (-- uv run tripmate) with a temporary TRIPMATE_DB: the overview, one --call of local_time, one --read of trip://trips, and one --prompt of packing_list with a missing id.
+
+
+Give me the JSON to add TripMate to Claude Desktop on this machine. Use the full absolute path to uv (find it with `which uv`, or `where uv` on Windows) and `uv run --directory <absolute project path> tripmate`, so it works no matter which folder Claude Desktop starts in. Show only the "tripmate" entry that goes inside "mcpServers", tell me where the config file is on my operating system, and say if I need to escape anything. Do not change any files.
